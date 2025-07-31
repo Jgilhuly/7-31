@@ -45,6 +45,86 @@
             font-weight: bold;
             margin: 10px 0;
         }
+        
+        .game-buttons {
+            margin: 20px 0;
+        }
+        
+        .game-btn {
+            background: linear-gradient(to bottom, #FF6B6B, #DC143C);
+            color: white;
+            border: 2px solid #8B0000;
+            padding: 10px 20px;
+            margin: 0 10px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .game-btn:hover {
+            background: linear-gradient(to bottom, #DC143C, #8B0000);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        
+        .high-scores-screen {
+            color: white;
+        }
+        
+        .high-scores-screen h2 {
+            font-size: 28px;
+            margin: 20px 0;
+            color: #FFB6C1;
+        }
+        
+        .high-scores-list {
+            background: rgba(139, 0, 0, 0.3);
+            border: 2px solid #8B0000;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            min-height: 200px;
+        }
+        
+        .score-entry {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 182, 193, 0.3);
+            font-size: 18px;
+        }
+        
+        .score-entry:last-child {
+            border-bottom: none;
+        }
+        
+        .score-rank {
+            font-weight: bold;
+            color: #FFB6C1;
+            width: 30px;
+        }
+        
+        .score-value {
+            font-weight: bold;
+            color: #FFFFFF;
+        }
+        
+        .new-high-score {
+            color: #FFD700;
+            font-size: 24px;
+            font-weight: bold;
+            margin: 10px 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            animation: glow 1s ease-in-out infinite alternate;
+        }
+        
+        @keyframes glow {
+            from { text-shadow: 2px 2px 4px rgba(0,0,0,0.5), 0 0 10px #FFD700; }
+            to { text-shadow: 2px 2px 4px rgba(0,0,0,0.5), 0 0 20px #FFD700, 0 0 30px #FFD700; }
+        }
     </style>
 </head>
 <body>
@@ -52,7 +132,20 @@
         <div id="score" class="score">Score: 0</div>
         <canvas id="gameCanvas" width="400" height="600"></canvas>
         <div id="instructions" class="instructions">Press SPACEBAR or CLICK to flap!</div>
+        <div id="startButtons" class="game-buttons" style="display: none;">
+            <button id="startHighScoresBtn" class="game-btn">High Scores</button>
+        </div>
         <div id="gameOver" class="game-over" style="display: none;">Game Over! Press SPACEBAR to restart</div>
+        <div id="newHighScore" class="new-high-score" style="display: none;">🎉 NEW HIGH SCORE! 🎉</div>
+        <div id="gameButtons" class="game-buttons" style="display: none;">
+            <button id="playAgainBtn" class="game-btn">Play Again</button>
+            <button id="highScoresBtn" class="game-btn">High Scores</button>
+        </div>
+        <div id="highScoresScreen" class="high-scores-screen" style="display: none;">
+            <h2>High Scores</h2>
+            <div id="highScoresList" class="high-scores-list"></div>
+            <button id="backToGameBtn" class="game-btn">Back to Game</button>
+        </div>
     </div>
 
     <script>
@@ -61,9 +154,10 @@
         const ctx = canvas.getContext('2d');
         
         // Game state
-        let gameState = 'start'; // 'start', 'playing', 'gameOver'
+        let gameState = 'start'; // 'start', 'playing', 'gameOver', 'highScores'
         let score = 0;
         let frameCount = 0;
+        let highScores = JSON.parse(localStorage.getItem('flappyBirdHighScores')) || [];
         
         // Bird object
         const bird = {
@@ -91,6 +185,7 @@
             bird.y = canvas.height / 2;
             bird.velocity = 0;
             pipes = [];
+            document.getElementById('newHighScore').style.display = 'none';
             updateUI();
         }
         
@@ -98,7 +193,13 @@
         function updateUI() {
             document.getElementById('score').textContent = `Score: ${score}`;
             document.getElementById('instructions').style.display = gameState === 'start' ? 'block' : 'none';
+            document.getElementById('startButtons').style.display = gameState === 'start' ? 'block' : 'none';
             document.getElementById('gameOver').style.display = gameState === 'gameOver' ? 'block' : 'none';
+            document.getElementById('newHighScore').style.display = gameState === 'gameOver' ? document.getElementById('newHighScore').style.display : 'none';
+            document.getElementById('gameButtons').style.display = gameState === 'gameOver' ? 'block' : 'none';
+            document.getElementById('highScoresScreen').style.display = gameState === 'highScores' ? 'block' : 'none';
+            document.getElementById('gameCanvas').style.display = gameState === 'highScores' ? 'none' : 'block';
+            document.getElementById('score').style.display = gameState === 'highScores' ? 'none' : 'block';
         }
         
         // Handle input
@@ -123,6 +224,61 @@
         
         canvas.addEventListener('click', handleInput);
         
+        // High score functions
+        function saveHighScore(newScore) {
+            if (newScore > 0) {
+                const wasHighScore = highScores.length === 0 || newScore > Math.max(...highScores);
+                highScores.push(newScore);
+                highScores.sort((a, b) => b - a);
+                highScores = highScores.slice(0, 10); // Keep only top 10
+                localStorage.setItem('flappyBirdHighScores', JSON.stringify(highScores));
+                
+                // Show new high score message
+                document.getElementById('newHighScore').style.display = wasHighScore ? 'block' : 'none';
+            }
+        }
+        
+        function displayHighScores() {
+            const highScoresList = document.getElementById('highScoresList');
+            if (highScores.length === 0) {
+                highScoresList.innerHTML = '<div class="score-entry"><span>No high scores yet!</span><span>Play a game to set your first score.</span></div>';
+                return;
+            }
+            
+            let html = '';
+            highScores.forEach((score, index) => {
+                html += `
+                    <div class="score-entry">
+                        <span class="score-rank">${index + 1}.</span>
+                        <span class="score-value">${score}</span>
+                    </div>
+                `;
+            });
+            highScoresList.innerHTML = html;
+        }
+        
+        // Button event listeners
+        document.getElementById('playAgainBtn').addEventListener('click', () => {
+            init();
+        });
+        
+        document.getElementById('highScoresBtn').addEventListener('click', () => {
+            gameState = 'highScores';
+            displayHighScores();
+            updateUI();
+        });
+        
+        document.getElementById('backToGameBtn').addEventListener('click', () => {
+            gameState = 'start';
+            updateUI();
+        });
+        
+        document.getElementById('startHighScoresBtn').addEventListener('click', () => {
+            gameState = 'highScores';
+            displayHighScores();
+            updateUI();
+        });
+        
         // Update bird physics
         function updateBird() {
             if (gameState !== 'playing') return;
@@ -133,6 +289,7 @@
             // Check boundaries
             if (bird.y <= 0 || bird.y + bird.height >= canvas.height) {
                 gameState = 'gameOver';
+                saveHighScore(score);
                 updateUI();
             }
         }
@@ -176,6 +333,7 @@
                 // Check for collision
                 if (checkCollision(bird, pipe)) {
                     gameState = 'gameOver';
+                    saveHighScore(score);
                     updateUI();
                 }
             }
