@@ -45,14 +45,120 @@
             font-weight: bold;
             margin: 10px 0;
         }
+        
+        .button {
+            background-color: #8B0000;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px 5px;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        
+        .button:hover {
+            background-color: #A52A2A;
+        }
+        
+        .high-scores-container {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            max-width: 400px;
+            margin: 0 auto;
+            display: none;
+        }
+        
+        .high-scores-title {
+            color: #FFFFFF;
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        
+        .high-scores-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .high-score-item {
+            background-color: rgba(255, 255, 255, 0.2);
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #FFFFFF;
+        }
+        
+        .high-score-rank {
+            font-size: 24px;
+            font-weight: bold;
+            color: #FFD700;
+            width: 40px;
+        }
+        
+        .high-score-details {
+            flex-grow: 1;
+            text-align: left;
+            margin-left: 20px;
+        }
+        
+        .high-score-points {
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        .high-score-date {
+            font-size: 14px;
+            color: #FFB6C1;
+        }
+        
+        .no-scores {
+            color: #FFFFFF;
+            font-size: 18px;
+            margin: 30px 0;
+        }
+        
+        .new-high-score {
+            color: #FFD700;
+            font-size: 24px;
+            font-weight: bold;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
     </style>
 </head>
 <body>
-    <div class="game-container">
+    <div class="game-container" id="gameView">
         <div id="score" class="score">Score: 0</div>
         <canvas id="gameCanvas" width="400" height="600"></canvas>
         <div id="instructions" class="instructions">Press SPACEBAR or CLICK to flap!</div>
-        <div id="gameOver" class="game-over" style="display: none;">Game Over! Press SPACEBAR to restart</div>
+        <div id="gameOver" class="game-over" style="display: none;">
+            <div>Game Over!</div>
+            <div id="finalScore"></div>
+            <div id="newHighScore" class="new-high-score" style="display: none;">NEW HIGH SCORE!</div>
+            <div style="font-size: 16px; margin-top: 10px;">Press SPACEBAR to restart</div>
+        </div>
+        <div id="gameButtons">
+            <button class="button" onclick="showHighScores()">View High Scores</button>
+        </div>
+    </div>
+    
+    <div class="high-scores-container" id="highScoresView">
+        <h2 class="high-scores-title">High Scores</h2>
+        <ul class="high-scores-list" id="highScoresList"></ul>
+        <div class="no-scores" id="noScores" style="display: none;">No high scores yet! Play to set the first record!</div>
+        <button class="button" onclick="showGame()">Back to Game</button>
     </div>
 
     <script>
@@ -64,6 +170,10 @@
         let gameState = 'start'; // 'start', 'playing', 'gameOver'
         let score = 0;
         let frameCount = 0;
+        let isNewHighScore = false;
+        
+        // High scores management
+        const MAX_HIGH_SCORES = 10;
         
         // Bird object
         const bird = {
@@ -83,6 +193,89 @@
         const pipeGap = 150;
         const pipeSpeed = 2;
         
+        // Load high scores from localStorage
+        function loadHighScores() {
+            const saved = localStorage.getItem('flappyBirdHighScores');
+            return saved ? JSON.parse(saved) : [];
+        }
+        
+        // Save high scores to localStorage
+        function saveHighScores(scores) {
+            localStorage.setItem('flappyBirdHighScores', JSON.stringify(scores));
+        }
+        
+        // Add a new high score
+        function addHighScore(newScore) {
+            const highScores = loadHighScores();
+            const newEntry = {
+                score: newScore,
+                date: new Date().toISOString()
+            };
+            
+            highScores.push(newEntry);
+            highScores.sort((a, b) => b.score - a.score);
+            highScores.splice(MAX_HIGH_SCORES);
+            
+            saveHighScores(highScores);
+            
+            // Check if it's a new high score
+            return highScores[0].score === newScore;
+        }
+        
+        // Check if score qualifies as high score
+        function isHighScore(score) {
+            const highScores = loadHighScores();
+            if (highScores.length < MAX_HIGH_SCORES) return true;
+            return score > highScores[highScores.length - 1].score;
+        }
+        
+        // Display high scores
+        function displayHighScores() {
+            const highScores = loadHighScores();
+            const listElement = document.getElementById('highScoresList');
+            const noScoresElement = document.getElementById('noScores');
+            
+            listElement.innerHTML = '';
+            
+            if (highScores.length === 0) {
+                noScoresElement.style.display = 'block';
+                return;
+            }
+            
+            noScoresElement.style.display = 'none';
+            
+            highScores.forEach((entry, index) => {
+                const li = document.createElement('li');
+                li.className = 'high-score-item';
+                
+                const date = new Date(entry.date);
+                const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+                
+                li.innerHTML = `
+                    <div class="high-score-rank">#${index + 1}</div>
+                    <div class="high-score-details">
+                        <div class="high-score-points">${entry.score} points</div>
+                        <div class="high-score-date">${dateStr}</div>
+                    </div>
+                `;
+                
+                listElement.appendChild(li);
+            });
+        }
+        
+        // Show high scores view
+        function showHighScores() {
+            document.getElementById('gameView').style.display = 'none';
+            document.getElementById('highScoresView').style.display = 'block';
+            displayHighScores();
+        }
+        
+        // Show game view
+        function showGame() {
+            document.getElementById('gameView').style.display = 'block';
+            document.getElementById('highScoresView').style.display = 'none';
+        }
+        
         // Initialize game
         function init() {
             gameState = 'start';
@@ -91,6 +284,7 @@
             bird.y = canvas.height / 2;
             bird.velocity = 0;
             pipes = [];
+            isNewHighScore = false;
             updateUI();
         }
         
@@ -99,6 +293,22 @@
             document.getElementById('score').textContent = `Score: ${score}`;
             document.getElementById('instructions').style.display = gameState === 'start' ? 'block' : 'none';
             document.getElementById('gameOver').style.display = gameState === 'gameOver' ? 'block' : 'none';
+            
+            if (gameState === 'gameOver') {
+                document.getElementById('finalScore').textContent = `Final Score: ${score}`;
+                document.getElementById('newHighScore').style.display = isNewHighScore ? 'block' : 'none';
+            }
+        }
+        
+        // Handle game over
+        function handleGameOver() {
+            gameState = 'gameOver';
+            
+            if (score > 0 && isHighScore(score)) {
+                isNewHighScore = addHighScore(score);
+            }
+            
+            updateUI();
         }
         
         // Handle input
@@ -132,8 +342,7 @@
             
             // Check boundaries
             if (bird.y <= 0 || bird.y + bird.height >= canvas.height) {
-                gameState = 'gameOver';
-                updateUI();
+                handleGameOver();
             }
         }
         
@@ -175,8 +384,7 @@
                 
                 // Check for collision
                 if (checkCollision(bird, pipe)) {
-                    gameState = 'gameOver';
-                    updateUI();
+                    handleGameOver();
                 }
             }
         }
